@@ -52,15 +52,14 @@ def getStartId():
 if __name__ == "__main__":
     initmapping()
     cursor = conn.cursor()
-    offset = 0
     id_min = long(sys.argv[1]) if len(sys.argv) >= 2 else getStartId()
-    limit = 200
+    limit = 250
     print "...start at id ", id_min
     while True:
         sql = \
             "select * from (\
-select * from mfg_report where id > %d order by id limit %d offset %d) as mr \
-join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit, offset)
+select * from mfg_report where id > %d order by id limit %d) as mr \
+join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit)
         batch = {} # id: {xxx, details: {xxx}}
         cursor.execute(sql)
         join_items = cursor.fetchall()
@@ -84,7 +83,6 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit, offset
                 col_no += 14
                 detail[detail_col_name] = val[col_no]
             report_info.setdefault("details", []).append(detail)
-        offset += len(batch)
         actions = []
         for key, val in batch.iteritems():
             action ={
@@ -99,5 +97,6 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit, offset
             os.system("cls")
         else:
             os.system("clear")
-        print "...import date to %s, id = %s"%(join_items[-1][9], join_items[-1][0])
+        id_min = join_items[-1][0]
+        print "...import date to %s, last_id = %s"%(join_items[-1][9], id_min)
         time.sleep(0.01)
