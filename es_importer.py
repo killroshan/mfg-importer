@@ -17,7 +17,6 @@ mrd_colnames = None
 conn = psycopg2.connect(database="dtaslog", user="postgres", password="Dji@123", host="127.0.0.1", port="5432")
 es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
 
-
 def initmapping():
     global es
     mapping = {
@@ -31,19 +30,33 @@ def initmapping():
             }
         }
     }
-    es.indices.create("dtas")
-    es.indices.put_mapping("mr", mapping, ["dtas"])
+    try:
+        es.indices.create("dtas")
+        es.indices.put_mapping("mr", mapping, ["dtas"])
+    except:
+        pass
 
+def getStartId():
+    body = {
+        "sort": {"id": "desc"},
+        "size": 1,
+        "stored_fields": []
+    }
+    try:
+        ret = es.search("dtas", "mr", body)
+        return long(ret["hits"]["hits"][0]["_id"])
+    except:
+        return -1
 
 if __name__ == "__main__":
-    print sys.argv
+    initmapping()
     cur_mr = conn.cursor()
     cur_mrd = conn.cursor()
     offset = 0
+    id_min = long(sys.argv[1]) if len(sys.argv) >= 2 else getStartId()
+    print "...start at id ", id_min
     while True:
-        sql_mr = "select * from mfg_report as mr " \
-              "order by mr.id " \
-              "limit 1 offset %s"%(offset, )
+        sql_mr = "select * from mfg_report where id > %d order by id limit 1 offset %s"%(id_min, offset)
         cur_mr.execute(sql_mr)
         mr_infos = cur_mr.fetchall()
         if mr_infos:
