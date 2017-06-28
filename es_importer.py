@@ -6,7 +6,6 @@
 import psycopg2
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
-import os
 import time
 import sys
 reload(sys)
@@ -93,10 +92,7 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit)
             }
             actions.append(action)
         helpers.bulk(es, actions)
-        if sys.platform == "win32":
-            os.system("cls")
-        else:
-            os.system("clear")
         id_min = join_items[-1][0]
-        print "...import date to %s, last_id = %s"%(join_items[-1][9], id_min)
+        sys.stdout.write("...import date to %s, last_id = %s \r"%(join_items[-1][9], id_min))
+        sys.stdout.flush()
         time.sleep(0.01)
