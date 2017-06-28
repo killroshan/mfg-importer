@@ -1,20 +1,42 @@
 # pip install -U pip
 # pip install psycopg2
 
-#-*-
+#-*- coding:utf-8 -*-
 
 import psycopg2
 from elasticsearch import Elasticsearch
-
-mr_colnames = None
-mrd_colnames = None
+import datetime
 import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
 
+
+mr_colnames = None
+mrd_colnames = None
+
+conn = psycopg2.connect(database="dtaslog", user="postgres", password="Dji@123", host="127.0.0.1", port="5432")
+es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
+
+
+def initmapping():
+    global es
+    mapping = {
+        "properties": {
+            "test_date": {
+                "type": "date",
+                "format": "yyyy-MM-dd HH:mm:ssZZ"
+            },
+            "details":{
+                "type": "nested",
+            }
+        }
+    }
+    es.indices.create("dtas")
+    es.indices.put_mapping("mr", mapping, ["dtas"])
+
+
 if __name__ == "__main__":
-    conn = psycopg2.connect(database="dtaslog", user="postgres", password="Dji@123", host="127.0.0.1", port="5432")
-    es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
+    print sys.argv
     cur_mr = conn.cursor()
     cur_mrd = conn.cursor()
     offset = 0
@@ -32,8 +54,10 @@ if __name__ == "__main__":
             for idx, colname in enumerate(mr_colnames):
                 val = mr_item[idx]
                 if val or val == 0:
-                    if colname in set(["test_time", "test_date"]):
+                    if colname == "test_time":
                         mr_dict[colname] = str(val)
+                    elif colname == "test_date":
+                        mr_dict[colname] = val.strftime("%Y-%m-%d %H:%M:%S%Z")
                     else:
                         mr_dict[colname] = val
             mr_id = mr_dict["id"]
@@ -51,7 +75,8 @@ if __name__ == "__main__":
                             mrd_dict[colname] = mrd_val
                     if mrd_dict:
                         mr_dict.setdefault("details", []).append(mrd_dict)
-            print offset, mr_id
+            # print offset, mr_id
+            # print(mr_dict["test_date"])
             print(es.index("dtas", "mr", mr_dict, mr_id))
             # break
         else:
