@@ -21,6 +21,7 @@ es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
 def initmapping():
     global es
     mappings = {
+        "_all": {"enabled": False},
         "properties": {
             "test_date": {
                 "type": "date",
@@ -68,7 +69,7 @@ def initmapping():
             # },
             "log":{
                 "type": "text",
-                "index": "not_analyzed"
+                "index": "no"
             },
             "details":{
                 "type": "nested",
@@ -87,7 +88,7 @@ def initmapping():
                     },
                     "detail":{
                         "type": "text",
-                        "index": "not_analyzed",
+                        "index": "no",
                     }
                 }
             }
