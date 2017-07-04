@@ -130,11 +130,30 @@ def getStartId():
     except:
         return -1
 
+def getTotal():
+    try:
+        return es.count("dtas", "mr")[u"count"]
+    except:
+        return 0
+
+last_msg = None
+def noscrollp(msg):
+    global last_msg
+    if last_msg is None:
+        pass
+        # sys.stdout.write(msg)
+    else:
+        sys.stdout.write("\0" * len(last_msg) + "\r")
+    last_msg = msg
+    sys.stdout.write(msg + "\r")
+    sys.stdout.flush()
+
 if __name__ == "__main__":
     initmapping()
     cursor = conn.cursor()
     id_min = long(sys.argv[1]) if len(sys.argv) >= 2 else getStartId()
-    limit = 250
+    limit = 200
+    total = 0
     print "...start at id ", id_min
     while True:
         sql = \
@@ -164,17 +183,48 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit)
                 col_no += 14
                 detail[detail_col_name] = val[col_no]
             report_info.setdefault("details", []).append(detail)
-        actions = []
-        for key, val in batch.iteritems():
-            action ={
-                "_index": "dtas",
-                "_type": "mr",
-                "_id": key,
-                "_source": val,
-            }
-            actions.append(action)
-        helpers.bulk(es, actions)
+
+        sorted_reports = sorted(batch.itervalues(), lambda a, b: a["id"] - b["id"])
+        es_batch = []
+        es_batch_size = 0
+        es_batch_max_size = 3000
+        for report_info in sorted_reports:
+            report_id = report_info["id"]
+            details_len = len(report_info["details"])
+            if details_len >= 100:
+                continue
+            if es_batch_size + details_len > es_batch_max_size:
+                if es_batch:
+                    total += len(es_batch)
+                    noscrollp("import batch size %s to ES, total %s"%(len(es_batch), total))
+                    helpers.bulk(es, es_batch)
+                    es_batch = []
+                    es_batch_size = 0
+
+                    es_batch_size += details_len
+                    action = {
+                        "_index": "dtas",
+                        "_type": "mr",
+                        "_id": report_id,
+                        "_source": report_info,
+                    }
+                    es_batch.append(action)
+            else:
+                es_batch_size += details_len
+                action = {
+                    "_index": "dtas",
+                    "_type": "mr",
+                    "_id": report_id,
+                    "_source": report_info,
+                }
+                es_batch.append(action)
+        else:
+            if es_batch:
+                total += len(es_batch)
+                noscrollp("import batch size %s to ES, total %s" % (len(es_batch), total))
+                helpers.bulk(es, es_batch)
+                es_batch = []
+                es_batch_size = 0
+
         id_min = join_items[-1][0]
-        sys.stdout.write("...import date to %s, last_id = %s \r"%(join_items[-1][9], id_min))
-        sys.stdout.flush()
         time.sleep(0.01)

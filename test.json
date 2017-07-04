@@ -1,0 +1,37 @@
+{
+    "query": {
+        "bool":{
+            "filter":[
+                {"range": {"test_date": {"gte": "2017-01-01 00:00:00+08", "lte": "2017-05-28 00:00:00+08"}}},
+                {"term": {"test_status": "pass"}},
+                {"term": {"part_number": "WM100"}},
+                {"nested":{
+                    "path": "details",
+                    "query":{
+                        "bool":{
+                            "filter": [
+                                {"term": {"details.item_name": "Gimbal"}}
+                            ]
+                        }
+                    }
+                }}
+            ]
+        }
+    },
+    "sort": [
+        {"test_date": "desc"}
+    ]
+}
+
+
+select count(*) from
+(
+select mr.id from mfg_report as mr
+join mfg_report_detail as mrd on (mr.id = mrd.report_id)
+where mrd.item_name = 'TI004'
+and mr.part_number = 'WM100'
+and test_date >= '2017-01-01 00:00:00+08'
+and test_date <= '2017-05-28 00:00:00+08'
+and lower(mr.test_status) = 'pass'
+group by mr.id
+) as ret
