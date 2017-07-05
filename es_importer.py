@@ -8,6 +8,7 @@ import psycopg2
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 import time
+import datetime
 import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -150,17 +151,19 @@ def noscrollp(msg):
 if __name__ == "__main__":
     initmapping()
     cursor = conn.cursor()
-    start_time = long(sys.argv[1]) if len(sys.argv) >= 2 else getStartTime()
+    start_time = sys.argv[1] if len(sys.argv) >= 2 else getStartTime()
+    end_time = sys.argv[2] if len(sys.argv) >= 3 else datetime.datetime.fromtimestamp(time.time() - 24 * 3600).strftime("%Y-%m-%d %H:%M:%S%Z")
+
     operator = ">="
     limit = 200
     total = 0
     offset = 0
-    print "start at ", start_time
+    print "start at %s, end at %s"%(start_time, end_time)
     while True:
         sql = \
             "select * from (\
-select * from mfg_report where test_date %s '%s' order by test_date asc limit %d offset %d) as mr \
-join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(operator, start_time, limit, offset)
+select * from mfg_report where test_date %s '%s' and test_date <= '%s' order by test_date limit %d offset %d) as mr \
+join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(operator, start_time, end_time, limit, offset)
         batch = {} # id: {xxx, details: {xxx}}
         noscrollp("reading from db, limit = %s, offset = %s, start_time = %s"%(limit, offset, start_time))
         cursor.execute(sql)
