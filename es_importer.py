@@ -118,17 +118,17 @@ def initmapping():
     except BaseException,e:
         print str(e)
 
-def getStartId():
+def getStartTime():
     body = {
-        "sort": {"id": "desc"},
+        "sort": {"test_date": "desc"},
         "size": 1,
-        "stored_fields": []
+        "_source": ["test_date"]
     }
     try:
         ret = es.search("dtas", "mr", body)
-        return long(ret["hits"]["hits"][0]["_id"])
+        return ret[u"hits"][u"hits"][0][u"_source"]["test_date"]
     except:
-        return -1
+        return "1970-01-01 00:00:00+08"
 
 def getTotal():
     try:
@@ -136,31 +136,33 @@ def getTotal():
     except:
         return 0
 
-last_msg = None
+last_msg = ""
 def noscrollp(msg):
     global last_msg
-    if last_msg is None:
-        pass
-        # sys.stdout.write(msg)
+    delta = len(msg) - len(last_msg)
+    if delta >= 0:
+        sys.stdout.write(msg + "\r")
     else:
-        sys.stdout.write("\0" * len(last_msg) + "\r")
-    last_msg = msg
-    sys.stdout.write(msg + "\r")
+        sys.stdout.write("".join([msg, " " * abs(delta), "\r"]))
     sys.stdout.flush()
+    last_msg = msg
 
 if __name__ == "__main__":
     initmapping()
     cursor = conn.cursor()
-    id_min = long(sys.argv[1]) if len(sys.argv) >= 2 else getStartId()
+    start_time = long(sys.argv[1]) if len(sys.argv) >= 2 else getStartTime()
+    operator = ">="
     limit = 200
     total = 0
-    print "...start at id ", id_min
+    offset = 0
+    print "start at ", start_time
     while True:
         sql = \
             "select * from (\
-select * from mfg_report where id > %d order by id limit %d) as mr \
-join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit)
+select * from mfg_report where test_date %s '%s' order by test_date asc limit %d offset %d) as mr \
+join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(operator, start_time, limit, offset)
         batch = {} # id: {xxx, details: {xxx}}
+        noscrollp("reading from db, limit = %s, offset = %s, start_time = %s"%(limit, offset, start_time))
         cursor.execute(sql)
         join_items = cursor.fetchall()
         colnames = colnames or [desc[0] for desc in cursor.description]
@@ -171,9 +173,10 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit)
             report_info = batch.setdefault(report_id, {})
             if not report_info: # padding common field
                 for col_no, common_colname in enumerate(colnames[0: 14]):
-                    if common_colname == "test_date":
-                        report_info[common_colname] = val[col_no].strftime("%Y-%m-%d %H:%M:%S%Z")
-                    elif common_colname == "test_time":
+                    # if common_colname == "test_date":
+                    #     pass
+                        # report_info[common_colname] = val[col_no].strftime("%Y-%m-%d %H:%M:%S%Z")
+                    if common_colname == "test_time":
                         report_info[common_colname] = str(val[col_no])
                     else:
                         report_info[common_colname] = val[col_no]
@@ -184,12 +187,13 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit)
                 detail[detail_col_name] = val[col_no]
             report_info.setdefault("details", []).append(detail)
 
-        sorted_reports = sorted(batch.itervalues(), lambda a, b: a["id"] - b["id"])
+        sorted_reports = sorted(batch.itervalues(), lambda a, b: cmp(a["test_date"], b["test_date"]))
         es_batch = []
         es_batch_size = 0
         es_batch_max_size = 3000
         for report_info in sorted_reports:
             report_id = report_info["id"]
+            report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z") # convert to string after sort
             details_len = len(report_info["details"])
             if details_len >= 100:
                 continue
@@ -226,5 +230,12 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(id_min, limit)
                 es_batch = []
                 es_batch_size = 0
 
-        id_min = join_items[-1][0]
+        latest_time = sorted_reports[-1]["test_date"] #string
+        if latest_time == start_time:
+            offset += len(sorted_reports)
+            operator = ">="
+        else:
+            start_time = latest_time
+            operator = ">"
+            offset = 0
         time.sleep(0.01)
