@@ -154,7 +154,6 @@ if __name__ == "__main__":
     start_time = sys.argv[1] if len(sys.argv) >= 2 else getStartTime()
     end_time = sys.argv[2] if len(sys.argv) >= 3 else datetime.datetime.fromtimestamp(time.time() - 24 * 3600).strftime("%Y-%m-%d %H:%M:%S%Z")
 
-    operator = ">="
     limit = 200
     total = 0
     offset = 0
@@ -162,8 +161,8 @@ if __name__ == "__main__":
     while True:
         sql = \
             "select * from (\
-select * from mfg_report where test_date %s '%s' and test_date <= '%s' order by test_date limit %d offset %d) as mr \
-join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(operator, start_time, end_time, limit, offset)
+select * from mfg_report where test_date >= '%s' and test_date <= '%s' order by test_date limit %d offset %d) as mr \
+join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time, limit, offset)
         batch = {} # id: {xxx, details: {xxx}}
         noscrollp("reading from db, limit = %s, offset = %s, start_time = %s"%(limit, offset, start_time))
         cursor.execute(sql)
@@ -234,11 +233,16 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(operator, start_time,
                 es_batch_size = 0
 
         latest_time = sorted_reports[-1]["test_date"] #string
+        _offset = 1
+        for report in sorted_reports[-2::-1]:
+            if report["test_date"] == latest_time:
+               _offset += 1
+            else:
+                break
+
         if latest_time == start_time:
-            offset += len(sorted_reports)
-            operator = ">="
+            offset += _offset
         else:
-            start_time = latest_time
-            operator = ">"
-            offset = 0
+            offset = _offset
+        start_time = latest_time
         time.sleep(0.01)

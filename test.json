@@ -35,3 +35,29 @@ and test_date <= '2017-05-28 00:00:00+08'
 and lower(mr.test_status) = 'pass'
 group by mr.id
 ) as ret
+
+{
+    "query": {
+        "bool": {
+            "filter": [
+                {"range": {"test_date": {"gte": "2017-02-01 00:00:00+08", "lte": "2017-02-02 00:00:00+08"}}}
+            ]
+        }
+    }
+}
+
+{
+    "aggs":{
+        "all_interests": {
+            "terms": {"field": "part_number"}
+        }
+    },
+    "query":{
+        "bool": {
+            "filter":[
+                {"range": {"test_date": {"gte": "2017-02-01 00:00:00+08", "lte": "2017-02-28 00:00:00+08"}}}
+            ]
+        }
+    },
+    "size": 0
+}
