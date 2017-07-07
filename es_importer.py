@@ -16,7 +16,10 @@ sys.setdefaultencoding('utf8')
 
 colnames = None
 
-conn = psycopg2.connect(database="dtaslog", user="postgres", password="Dji@123", host="127.0.0.1", port="5432")
+try:
+    conn = psycopg2.connect(database="dtaslog", user="postgres", password="Dji@123", host="127.0.0.1")
+except:
+    conn = psycopg2.connect(database="dtaslog", user="autotest", password="woxI*&12", host="10.17.1.14")
 es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
 
 def initmapping():
@@ -72,6 +75,10 @@ def initmapping():
                 "type": "text",
                 "index": "no"
             },
+            "item_names":{
+                "type": "text",
+                "analyzer": "item_names_analyzer",
+            },
             "details":{
                 "type": "nested",
                 "properties":{
@@ -101,6 +108,9 @@ def initmapping():
                 "analyzer": {
                     "tri_analyzer": {
                         "tokenizer": "tri_tokenizer"
+                    },
+                    "item_names_analyzer":{
+                        "tokenizer": "item_tokenizer",
                     }
                 },
                 "tokenizer": {
@@ -108,6 +118,11 @@ def initmapping():
                         "type": "ngram",
                         "min_gram": 3,
                         "max_gram": 14,
+                    },
+                    "item_tokenizer":{
+                        "type": "pattern",
+                        "pattern": "\|\|\|\|",
+
                     }
                 }
             }
@@ -139,14 +154,15 @@ def getTotal():
 
 last_msg = ""
 def noscrollp(msg):
-    global last_msg
-    delta = len(msg) - len(last_msg)
-    if delta >= 0:
-        sys.stdout.write(msg + "\r")
-    else:
-        sys.stdout.write("".join([msg, " " * abs(delta), "\r"]))
-    sys.stdout.flush()
-    last_msg = msg
+    print msg
+    # global last_msg
+    # delta = len(msg) - len(last_msg)
+    # if delta >= 0:
+    #     sys.stdout.write(msg + "\r")
+    # else:
+    #     sys.stdout.write("".join([msg, " " * abs(delta), "\r"]))
+    # sys.stdout.flush()
+    # last_msg = msg
 
 if __name__ == "__main__":
     initmapping()
@@ -154,7 +170,7 @@ if __name__ == "__main__":
     start_time = sys.argv[1] if len(sys.argv) >= 2 else getStartTime()
     end_time = sys.argv[2] if len(sys.argv) >= 3 else datetime.datetime.fromtimestamp(time.time() - 24 * 3600).strftime("%Y-%m-%d %H:%M:%S%Z")
 
-    limit = 200
+    limit = 300
     total = 0
     offset = 0
     print "start at %s, end at %s"%(start_time, end_time)
@@ -187,18 +203,22 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time,
             for col_no, detail_col_name in enumerate(colnames[14:]):
                 col_no += 14
                 detail[detail_col_name] = val[col_no]
+            detail_item_name = detail["item_name"]
             report_info.setdefault("details", []).append(detail)
+            report_info.setdefault("item_names", []).append(detail_item_name)
 
         sorted_reports = sorted(batch.itervalues(), lambda a, b: cmp(a["test_date"], b["test_date"]))
         es_batch = []
         es_batch_size = 0
         es_batch_max_size = 3000
+        latest_datetime = sorted_reports[-1]["test_date"]
         for report_info in sorted_reports:
-            report_id = report_info["id"]
-            report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z") # convert to string after sort
             details_len = len(report_info["details"])
             if details_len >= 100:
                 continue
+            report_id = report_info["id"]
+            report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z") # convert to string after sort
+            report_info["item_names"] = "||||".join(list(set(report_info["item_names"]))) # convert to string
             if es_batch_size + details_len > es_batch_max_size:
                 if es_batch:
                     total += len(es_batch)
@@ -242,6 +262,12 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time,
 
         if latest_time == start_time:
             offset += _offset
+            if offset >= 5000:
+                offset = 0
+                latest_time = (latest_datetime + datetime.timedelta(seconds = 1)).strftime("%Y-%m-%d %H:%M:%S%Z")
+                # f = open("log", "a+")
+                # f.write(start_time + "\n")
+                # f.close()
         else:
             offset = _offset
         start_time = latest_time
