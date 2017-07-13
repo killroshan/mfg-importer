@@ -213,11 +213,12 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time,
         es_batch_max_size = 3000
         latest_datetime = sorted_reports[-1]["test_date"]
         for report_info in sorted_reports:
+            report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z")  # convert to string after sort
             details_len = len(report_info["details"])
             if details_len >= 100:
                 continue
             report_id = report_info["id"]
-            report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z") # convert to string after sort
+            # report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z") # convert to string after sort
             report_info["item_names"] = "||||".join(list(set(report_info["item_names"]))) # convert to string
             if es_batch_size + details_len > es_batch_max_size:
                 if es_batch:
