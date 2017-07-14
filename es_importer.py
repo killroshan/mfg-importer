@@ -20,7 +20,7 @@ try:
     conn = psycopg2.connect(database="dtaslog", user="postgres", password="Dji@123", host="127.0.0.1")
 except:
     conn = psycopg2.connect(database="dtaslog", user="autotest", password="woxI*&12", host="10.17.1.14")
-es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
+es = Elasticsearch(hosts=[{"host": "10.17.1.14", "port": 9200}])
 
 def initmapping():
     global es
