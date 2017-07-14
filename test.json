@@ -54,7 +54,7 @@
             },
             "aggs":{
                 "all":{
-                    "terms": {"field": "details.item_name"}
+                    "terms": {"field": "details.item_name", "size": 10001}
                 }
             }
         }

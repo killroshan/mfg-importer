@@ -178,7 +178,7 @@ if __name__ == "__main__":
         sql = \
             "select * from (\
 select * from mfg_report where test_date >= '%s' and test_date <= '%s' order by test_date limit %d offset %d) as mr \
-join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time, limit, offset)
+left join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time, limit, offset)
         batch = {} # id: {xxx, details: {xxx}}
         noscrollp("reading from db, limit = %s, offset = %s, start_time = %s"%(limit, offset, start_time))
         cursor.execute(sql)
@@ -191,21 +191,19 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time,
             report_info = batch.setdefault(report_id, {})
             if not report_info: # padding common field
                 for col_no, common_colname in enumerate(colnames[0: 14]):
-                    # if common_colname == "test_date":
-                    #     pass
-                        # report_info[common_colname] = val[col_no].strftime("%Y-%m-%d %H:%M:%S%Z")
                     if common_colname == "test_time":
                         report_info[common_colname] = str(val[col_no])
                     else:
                         report_info[common_colname] = val[col_no]
             # padding detail fields
             detail = {}
-            for col_no, detail_col_name in enumerate(colnames[14:]):
-                col_no += 14
-                detail[detail_col_name] = val[col_no]
-            detail_item_name = detail["item_name"]
-            report_info.setdefault("details", []).append(detail)
-            report_info.setdefault("item_names", []).append(detail_item_name)
+            if val[14] is not None: # details is not none
+                for col_no, detail_col_name in enumerate(colnames[14:]):
+                    col_no += 14
+                    detail[detail_col_name] = val[col_no]
+                detail_item_name = detail["item_name"]
+                report_info.setdefault("details", []).append(detail)
+                report_info.setdefault("item_names", []).append(detail_item_name)
 
         sorted_reports = sorted(batch.itervalues(), lambda a, b: cmp(a["test_date"], b["test_date"]))
         es_batch = []
@@ -214,12 +212,11 @@ join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time,
         latest_datetime = sorted_reports[-1]["test_date"]
         for report_info in sorted_reports:
             report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z")  # convert to string after sort
-            details_len = len(report_info["details"])
+            details_len = len(report_info["details"]) if report_info.has_key("details") else 0
             if details_len >= 100:
                 continue
             report_id = report_info["id"]
-            # report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z") # convert to string after sort
-            report_info["item_names"] = "||||".join(list(set(report_info["item_names"]))) # convert to string
+            report_info["item_names"] = "||||".join(set(report_info.setdefault("item_names", [])))
             if es_batch_size + details_len > es_batch_max_size:
                 if es_batch:
                     total += len(es_batch)
