@@ -7,6 +7,7 @@
 import psycopg2
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
+from config import mappings, settings
 import time
 import datetime
 import sys
@@ -20,119 +21,30 @@ try:
     conn = psycopg2.connect(database="dtaslog", user="postgres", password="Dji@123", host="127.0.0.1")
 except:
     conn = psycopg2.connect(database="dtaslog", user="autotest", password="woxI*&12", host="10.17.1.14")
-es = Elasticsearch(hosts=[{"host": "10.17.1.14", "port": 9200}])
+
+# try:
+#     es = Elasticsearch(hosts=[{"host": "10.17.1.14", "port": 9200}])
+# except:
+es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
 
 def initmapping():
     global es
-    mappings = {
-        "_all": {"enabled": False},
-        "properties": {
-            "test_date": {
-                "type": "date",
-                "format": "yyyy-MM-dd HH:mm:ssZZ"
-            },
-            "station_id": {
-                "type": "string",
-                "index": "not_analyzed",
-            },
-            "station_name": {
-                "type": "string",
-                "index": "not_analyzed",
-            },
-            "dut_sn":{
-                "type": "string",
-                "analyzer": "tri_analyzer",
-            },
-            "test_time":{
-                "type": "string",
-                "index": "not_analyzed",
-            },
-            "test_site":{
-                "type": "string",
-                "index": "not_analyzed"
-            },
-            "op_id":{
-                "type": "string",
-                "index": "not_analyzed",
-            },
-            "part_number":{
-                "type": "string",
-                "index": "not_analyzed",
-            },
-            "test_sw_rev":{
-                "type": "string",
-                "index": "not_analyzed",
-            },
-            "pc_name": {
-                "type": "string",
-                "index": "not_analyzed",
-            },
-            # test_status为Pass, PASS, PAss...等，所以用默认的standard tokenizer转换为小写，查询时也要用小写的pass或者fail
-            # "test_status":{
-            #     "index": "standard"
-            # },
-            "log":{
-                "type": "text",
-                "index": "no"
-            },
-            "item_names":{
-                "type": "text",
-                "analyzer": "item_names_analyzer",
-            },
-            "details":{
-                "type": "nested",
-                "properties":{
-                    "description": {
-                        "type": "string",
-                        "index": "not_analyzed",
-                    },
-                    "item_name":{
-                        "type": "string",
-                        "index": "not_analyzed",
-                    },
-                    "unit":{
-                        "type": "string",
-                        "index": "not_analyzed",
-                    },
-                    "detail":{
-                        "type": "text",
-                        "index": "no",
-                    }
-                }
-            }
-        }
-    }
-    settings = {
-        "settings":{
-            "analysis": {
-                "analyzer": {
-                    "tri_analyzer": {
-                        "tokenizer": "tri_tokenizer"
-                    },
-                    "item_names_analyzer":{
-                        "tokenizer": "item_tokenizer",
-                    }
-                },
-                "tokenizer": {
-                    "tri_tokenizer": {
-                        "type": "ngram",
-                        "min_gram": 3,
-                        "max_gram": 14,
-                    },
-                    "item_tokenizer":{
-                        "type": "pattern",
-                        "pattern": "\|\|\|\|",
-
-                    }
-                }
-            }
-        }
-    }
     try:
         es.indices.create("dtas", settings)
         es.indices.put_mapping("mr", mappings, ["dtas"])
     except BaseException,e:
         print str(e)
+
+def makeTemplate():
+    body = {
+        "template": "dtas-*",
+        "settings": settings["settings"],
+        "mappings": {
+            "_default_": mappings,
+        }
+    }
+    print body
+    es.indices.put_template("template_dtas", body)
 
 def getStartTime():
     body = {
@@ -141,14 +53,14 @@ def getStartTime():
         "_source": ["test_date"]
     }
     try:
-        ret = es.search("dtas", "mr", body)
+        ret = es.search("dtas-*", "mr", body)
         return ret[u"hits"][u"hits"][0][u"_source"]["test_date"]
     except:
         return "1970-01-01 00:00:00+08"
 
 def getTotal():
     try:
-        return es.count("dtas", "mr")[u"count"]
+        return es.count("dtas-*", "mr")[u"count"]
     except:
         return 0
 
@@ -165,7 +77,7 @@ def noscrollp(msg):
     # last_msg = msg
 
 if __name__ == "__main__":
-    initmapping()
+    # initmapping()
     cursor = conn.cursor()
     start_time = sys.argv[1] if len(sys.argv) >= 2 else getStartTime()
     end_time = sys.argv[2] if len(sys.argv) >= 3 else datetime.datetime.fromtimestamp(time.time() - 24 * 3600).strftime("%Y-%m-%d %H:%M:%S%Z")
@@ -212,6 +124,7 @@ left join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_
         latest_datetime = sorted_reports[-1]["test_date"]
         for report_info in sorted_reports:
             report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z")  # convert to string after sort
+            index_suffix = report_info["test_date"][0:7]
             details_len = len(report_info["details"]) if report_info.has_key("details") else 0
             if details_len >= 100:
                 continue
@@ -227,7 +140,7 @@ left join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_
 
                     es_batch_size += details_len
                     action = {
-                        "_index": "dtas",
+                        "_index": "dtas-" + index_suffix,
                         "_type": "mr",
                         "_id": report_id,
                         "_source": report_info,
@@ -236,7 +149,7 @@ left join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_
             else:
                 es_batch_size += details_len
                 action = {
-                    "_index": "dtas",
+                    "_index": "dtas-" + index_suffix,
                     "_type": "mr",
                     "_id": report_id,
                     "_source": report_info,
