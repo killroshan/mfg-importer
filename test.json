@@ -46,25 +46,37 @@
 //    }
 //}
 
+//{
+//    "aggs":{
+//        "details":{
+//            "nested":{
+//                "path": "details"
+//            },
+//            "aggs":{
+//                "all":{
+//                    "terms": {"field": "details.item_name", "size": 10001}
+//                }
+//            }
+//        }
+//    },
+//    "query":{
+//        "bool": {
+//            "filter":[
+//                {"range": {"test_date": {"gte": "2017-02-01 00:00:00+08", "lte": "2017-02-28 00:00:00+08"}}}
+//            ]
+//        }
+//    },
+//    "size": 0
+//}
+
 {
-    "aggs":{
-        "details":{
-            "nested":{
-                "path": "details"
-            },
-            "aggs":{
-                "all":{
-                    "terms": {"field": "details.item_name", "size": 10001}
-                }
-            }
-        }
-    },
-    "query":{
+    "query": {
         "bool": {
             "filter":[
-                {"range": {"test_date": {"gte": "2017-02-01 00:00:00+08", "lte": "2017-02-28 00:00:00+08"}}}
+                {"range": {"test_date": {"gte": "2017-03-01 00:00:00+08", "lte": "2017-04-01 00:00:00+08"}}}
             ]
         }
     },
-    "size": 0
+    "sort": {"test_date": "asc"},
+    "size": 100
 }

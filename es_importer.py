@@ -56,7 +56,7 @@ def getStartTime():
         ret = es.search("dtas-*", "mr", body)
         return ret[u"hits"][u"hits"][0][u"_source"]["test_date"]
     except:
-        return "1970-01-01 00:00:00+08"
+        raise RuntimeError("error get start time")
 
 def getTotal():
     try:
@@ -142,7 +142,7 @@ left join mfg_report_detail_0 as mrd on (mr.id = mrd.report_id)"%(start_time, en
                 report_info["test_date"] = report_info["test_date"].strftime("%Y-%m-%d %H:%M:%S%Z")  # convert to string after sort
                 index_suffix = report_info["test_date"][0:7]
                 details_len = len(report_info["details"]) if report_info.has_key("details") else 0
-                if details_len >= 100:
+                if details_len > 500:
                     continue
                 report_id = report_info["id"]
                 report_info["item_names"] = "||||".join(set(report_info.setdefault("item_names", [])))
