@@ -105,8 +105,8 @@ if __name__ == "__main__":
         while True:
             sql = \
                 "select * from (\
-select * from mfg_report where test_date >= '%s' and test_date <= '%s' order by test_date limit %d offset %d) as mr \
-left join mfg_report_detail as mrd on (mr.id = mrd.report_id)"%(start_time, end_time, limit, offset)
+select * from mfg_report_0 where test_date >= '%s' and test_date <= '%s' order by test_date limit %d offset %d) as mr \
+left join mfg_report_detail_0 as mrd on (mr.id = mrd.report_id)"%(start_time, end_time, limit, offset)
             batch = {} # id: {xxx, details: {xxx}}
             noscrollp("reading from db, limit = %s, offset = %s, start_time = %s"%(limit, offset, start_time))
             cursor.execute(sql)
