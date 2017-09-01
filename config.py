@@ -68,13 +68,24 @@ mappings = {
                 },
                 "detail":{
                     "type": "text",
+                    "index": "not_analyzed",
+                },
+                "usl":{
+                    "type": "double",
+                    "index": "no",
+                },
+                "lsl":{
+                    "type": "double",
+                    "index": "no",
+                },
+                "result":{
+                    "type": "double",
                     "index": "no",
                 }
             }
         }
     }
 }
-
 
 settings = {
     "settings":{
