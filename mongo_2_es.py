@@ -12,7 +12,13 @@ try:
 except:
     mc = pymongo.MongoClient("localhost", 27017)
 
-es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
+try
+    es = Elasticsearch(hosts=[{"host": "10.17.1.11", "port": 9200},
+                              {"host": "10.17.1.12", "port": 9200},
+                              {"host": "10.17.1.13", "port": 9200},
+                              {"host": "10.17.1.14", "port": 9200}])
+except:
+    es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200}])
 
 def process_mongo_doc(doc):
     item_names_list = []
