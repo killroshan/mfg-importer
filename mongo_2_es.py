@@ -12,7 +12,7 @@ try:
 except:
     mc = pymongo.MongoClient("localhost", 27017)
 
-try
+try:
     es = Elasticsearch(hosts=[{"host": "10.17.1.11", "port": 9200},
                               {"host": "10.17.1.12", "port": 9200},
                               {"host": "10.17.1.13", "port": 9200},
@@ -22,6 +22,9 @@ except:
 
 def process_mongo_doc(doc):
     item_names_list = []
+    if len(doc.get("details", [])) >= 500:
+        return None
+
     for test_item in doc.get("details", []):
         if test_item.has_key("item_name"):
             item_names_list.append(test_item["item_name"])
@@ -71,6 +74,7 @@ if __name__ == "__main__":
     try:
         while it:
             doc = process_mongo_doc(it.next())
+            count += 1
             if doc:
                 doc_id = doc["id"]
                 action = {
@@ -81,11 +85,10 @@ if __name__ == "__main__":
                 }
                 batch.append(action)
                 if len(batch) >= 100:
-                    count += len(batch)
                     print "import batch size %s, last_id = %s, percent = %.2f"%(len(batch), doc_id, count / float(total))
                     helpers.bulk(es, batch)
                     batch = []
-                    time.sleep(0.2)
+                    # time.sleep(0.01)
 
     except StopIteration:
         if batch:
