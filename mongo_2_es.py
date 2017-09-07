@@ -3,6 +3,7 @@ import time
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 from pymongo import ReadPreference
+from elasticsearch.exceptions import NotFoundError
 
 import sys
 
@@ -33,16 +34,34 @@ def process_mongo_doc(doc):
     else:
         return None
 
+def find_last_id(index):
+    body = {
+        "sort": {"id": "desc"},
+        "size": 1,
+        "_source": ["id"]
+    }
+    try:
+        ret = es.search(index, "mr", body)
+        return ret[u"hits"][u"hits"][0][u"_source"]["id"]
+    except NotFoundError:
+        return 0
 
 
 if __name__ == "__main__":
     suffix = sys.argv[1] # 201701~201708
-    # it = mc["dtas-npi-db"]["npi-report-" + suffix].find(batch_size = 500, sort = [("_id", 1)])
-    it = mc.get_database("dtas-npi-db", read_preference=ReadPreference.SECONDARY)["npi-report-" + suffix].find(batch_size = 500, sort = [("_id", 1)])
+    index = "dtas-" + suffix
+    last_id = find_last_id(index)
+
+    db = mc.get_database("dtas-npi-db", read_preference=ReadPreference.SECONDARY)
+    co = db.get_collection("npi-report-" + suffix)
+
+    it = co.find({"_id": {"$gt": last_id}}, batch_size = 500, sort = [("_id", 1)])
+
     total = it.count()
-    print "total doc num: %d "%(total, )
+    print "begin at %s, total doc num: %d "%(last_id, total)
     count = 0
     batch = []
+
     try:
         while it:
             doc = process_mongo_doc(it.next())
