@@ -35,6 +35,10 @@ mappings = {
             "type": "string",
             "index": "not_analyzed",
         },
+        "line_id":{
+            "type": "string",
+            "index": "not_analyzed",
+        },
         "test_sw_rev":{
             "type": "string",
             "index": "not_analyzed",
@@ -102,7 +106,7 @@ settings = {
                 "tri_tokenizer": {
                     "type": "ngram",
                     "min_gram": 3,
-                    "max_gram": 14,
+                    "max_gram": 20,
                 },
                 "item_tokenizer":{
                     "type": "pattern",
