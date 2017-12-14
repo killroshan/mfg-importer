@@ -74,7 +74,7 @@ try:
 except:
     mysql = pymysql.connect(host = "localhost", user = "autotest", password = "uix&29X@", db = "autotest")
 
-helpers = [""]
+helpers = ["jobid", "projectid", "planid", "stime", "ftime", "starter", "total", "fin", "status", "tags", "arguments", "properties"]
 
 def initmapping():
     global es
