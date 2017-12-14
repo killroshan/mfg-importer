@@ -95,9 +95,22 @@ def processRow(row):
                 data[header] = row[idx].strftime("%Y-%m-%d %H:%M:%S")
             elif header == "properties":
                 try:
-                    data[header] = json.loads(row[idx], encoding="utf-8")
+                    jdict = json.loads(row[idx], encoding="utf-8")
+                    if jdict.has_key("retry_list"):
+                        if len(jdict["retry_list"]) == 0:
+                            del jdict["retry_list"]
+                            # print jdict["retry_list"], row[0], "retry"
+
+                    # if jdict.has_key("merge_list"):
+                    #     if len(jdict["merge_list"]) == 0:
+                    #         print jdict["merge_list"], row[0], "merge"
+                    #
+                    # if jdict.has_key("retry_jobids"):
+                    #     if len(jdict["retry_jobids"]) == 0:
+                    #         print jdict["retry_jobids"], row[0], "retry_jobids"
+                    data[header] = jdict
                 except:
-                    print "decode json failed, %s %s"%(row[0], row[idx])
+                    pass
             else:
                 data[header] = row[idx]
     return data
