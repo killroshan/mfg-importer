@@ -1,4 +1,7 @@
+#-*- coding:utf-8 -*-
+
 import pymysql
+import json
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 from config import mappings, settings
@@ -74,7 +77,7 @@ try:
 except:
     mysql = pymysql.connect(host = "localhost", user = "autotest", password = "uix&29X@", db = "autotest")
 
-helpers = ["jobid", "projectid", "planid", "stime", "ftime", "starter", "total", "fin", "status", "tags", "arguments", "properties"]
+headers = ["jobid", "projectid", "planid", "stime", "ftime", "starter", "total", "fin", "status", "tags", "arguments", "properties"]
 
 def initmapping():
     global es
@@ -84,17 +87,42 @@ def initmapping():
     except BaseException, e:
         print str(e)
 
+def processRow(row):
+    data = {}
+    for idx, header in enumerate(headers):
+        if row[idx] != None:
+            if header == "stime" or header == "ftime":
+                data[header] = row[idx].strftime("%Y-%m-%d %H:%M:%S")
+            elif header == "properties":
+                try:
+                    data[header] = json.loads(row[idx], encoding="utf-8")
+                except:
+                    print "decode json failed, %s %s"%(row[0], row[idx])
+            else:
+                data[header] = row[idx]
+    return data
+
 def export2ES():
     cursor = mysql.cursor()
     cursor.execute("select * from job")
 
+    total = 0
     while True:
-        rows = cursor.fetchmany(1000)
+        rows = cursor.fetchmany(300)
+
         if len(rows) > 0:
-            print(rows[0])
-            return
-
-        break
-
-    # cursor1 = mysql.cursor()
-    # print(cursor1.execute("select count(*) from job"))
+            total += len(rows)
+            es_batch = []
+            for row in rows:
+                doc = (processRow(row))
+                action = {
+                    "_index": "job-dtas",
+                    "_type": "job",
+                    "_id": doc["jobid"],
+                    "_source": doc,
+                }
+                es_batch.append(action)
+            helpers.bulk(es, es_batch)
+            print "export %s docs"%(total, )
+        else:
+            break
