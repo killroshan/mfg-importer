@@ -55,6 +55,10 @@ mappings = {
             "type": "text",
             "analyzer": "item_names_analyzer",
         },
+        "files":{
+            "type": "string",
+            "index": "no"
+        },
         "details":{
             "type": "nested",
             "properties":{
